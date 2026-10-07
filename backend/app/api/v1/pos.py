@@ -6,7 +6,7 @@ from typing import List
 
 from app.core.database import get_db
 from app.core.security import get_current_owner
-from app.models.entities import Owner, Store, Product, ProductVariant, Order, OrderItem
+from app.models.entities import Owner, Store, Product, ProductVariant, ProductSerial, Order, OrderItem
 from app.schemas.dto import OrderCreate
 
 router = APIRouter(prefix="/stores/{store_id}/pos", tags=["Point of Sale (POS)"])
@@ -126,3 +126,40 @@ def get_recent_orders(
 ):
     """Mendapatkan transaksi terbaru untuk toko ini"""
     return db.query(Order).filter(Order.store_id == store_id).order_by(Order.created_at.desc()).limit(20).all()
+
+
+@router.get("/warranty-check")
+def check_warranty(
+    store_id: int,
+    sn: str,
+    current_owner: Owner = Depends(get_current_owner),
+    db: Session = Depends(get_db)
+):
+    """Cek status garansi berdasarkan Serial Number (SN)"""
+    serial = db.query(ProductSerial).join(Product).filter(
+        Product.store_id == store_id,
+        ProductSerial.serial_number.ilike(sn.strip())
+    ).first()
+
+    if not serial:
+        raise HTTPException(status_code=404, detail="Serial number tidak ditemukan di database toko ini.")
+
+    product = serial.product
+    
+    # Check if sold in order_items
+    order_item = db.query(OrderItem).join(Order).filter(
+        Order.store_id == store_id,
+        OrderItem.product_id == product.id
+    ).order_by(Order.created_at.desc()).first()
+
+    return {
+        "serial_number": serial.serial_number,
+        "product_name": product.name,
+        "product_sku": product.sku,
+        "status": serial.status,
+        "warranty_months": serial.warranty_months,
+        "warranty_expiry": serial.warranty_expiry.strftime("%d %b %Y") if serial.warranty_expiry else f"{serial.warranty_months} Bulan sejak pembelian",
+        "created_at": serial.created_at.strftime("%d %b %Y"),
+        "last_order": order_item.order.invoice_number if order_item else None
+    }
+

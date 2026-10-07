@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { 
   Search, Plus, Trash2, Printer, Check, 
   ArrowLeft, CreditCard, Banknote, QrCode, User, 
-  Utensils, Cpu, ShoppingBag, AlertCircle
+  Utensils, Cpu, ShoppingBag, AlertCircle, ShieldCheck
 } from 'lucide-react';
 
 export default function PosPage({ store, onBackToStores }) {
@@ -11,6 +11,13 @@ export default function PosPage({ store, onBackToStores }) {
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // Warranty modal
+  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
+  const [warrantySN, setWarrantySN] = useState('');
+  const [warrantyResult, setWarrantyResult] = useState(null);
+  const [warrantyError, setWarrantyError] = useState('');
+  const [warrantyLoading, setWarrantyLoading] = useState(false);
   
   // Checkout modal
   const [showCheckout, setShowCheckout] = useState(false);
@@ -130,6 +137,22 @@ export default function PosPage({ store, onBackToStores }) {
     }
   };
 
+  const handleCheckWarranty = async (e) => {
+    if (e) e.preventDefault();
+    if (!warrantySN.trim()) return;
+    try {
+      setWarrantyLoading(true);
+      setWarrantyError('');
+      setWarrantyResult(null);
+      const res = await api.checkWarranty(store.id, warrantySN.trim());
+      setWarrantyResult(res);
+    } catch (err) {
+      setWarrantyError(err.message || 'Nomor seri tidak ditemukan');
+    } finally {
+      setWarrantyLoading(false);
+    }
+  };
+
   const formatRupiah = (val) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
   };
@@ -167,6 +190,14 @@ export default function PosPage({ store, onBackToStores }) {
                 className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500"
               />
             </div>
+            {store.business_type === 'electronics' && (
+              <button
+                onClick={() => { setShowWarrantyModal(true); setWarrantyResult(null); setWarrantyError(''); }}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 shrink-0 shadow-sm transition"
+              >
+                <ShieldCheck className="w-4 h-4" /> Cek Garansi
+              </button>
+            )}
             <button
               onClick={() => setShowAddProduct(true)}
               className="px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 shrink-0 shadow-sm transition"
@@ -199,7 +230,19 @@ export default function PosPage({ store, onBackToStores }) {
                   className="bg-white border border-slate-200 hover:border-brand-500 hover:shadow-md rounded-xl p-3.5 cursor-pointer transition flex flex-col justify-between group"
                 >
                   <div>
-                    <span className="text-xs font-mono text-slate-400">{p.sku || `#${p.id}`}</span>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-mono text-slate-400">{p.sku || `#${p.id}`}</span>
+                      {p.has_serial_number && (
+                        <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200">
+                          Garansi SN
+                        </span>
+                      )}
+                      {p.has_variants && (
+                        <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
+                          Multi-Varian
+                        </span>
+                      )}
+                    </div>
                     <h4 className="font-semibold text-slate-900 group-hover:text-brand-600 transition text-sm line-clamp-2 mt-0.5">
                       {p.name}
                     </h4>
@@ -496,6 +539,110 @@ export default function PosPage({ store, onBackToStores }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL CEK GARANSI (ELECTRONICS & SERIAL NUMBER) */}
+      {showWarrantyModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2 text-emerald-600 font-bold text-lg">
+                <ShieldCheck className="w-6 h-6" />
+                <span>Cek Garansi & Serial Number</span>
+              </div>
+              <button
+                onClick={() => setShowWarrantyModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCheckWarranty} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Masukkan / Scan Nomor Seri (Serial Number)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: DVR2026-001289 atau NVME-SN882910"
+                    value={warrantySN}
+                    onChange={(e) => setWarrantySN(e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={warrantyLoading}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-500/20 transition disabled:opacity-50"
+                  >
+                    {warrantyLoading ? 'Mengecek...' : 'Periksa'}
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {warrantyError && (
+              <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-700 text-xs font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{warrantyError}</span>
+              </div>
+            )}
+
+            {warrantyResult && (
+              <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 text-xs">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                  <span className="text-slate-500">Status Barang:</span>
+                  <span className={`px-2 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                    warrantyResult.status === 'in_stock' 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : warrantyResult.status === 'sold'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {warrantyResult.status === 'in_stock' ? 'Belum Terjual (Stok Toko)' : warrantyResult.status === 'sold' ? 'Sudah Terjual (Aktif)' : warrantyResult.status}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Nama Produk:</span>
+                  <span className="font-bold text-slate-800 text-right">{warrantyResult.product_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Kode SKU:</span>
+                  <span className="font-mono text-slate-700">{warrantyResult.product_sku || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Serial Number:</span>
+                  <span className="font-mono font-bold text-slate-900">{warrantyResult.serial_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Durasi Garansi:</span>
+                  <span className="font-semibold text-emerald-700">{warrantyResult.warranty_months} Bulan</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Masa Berlaku:</span>
+                  <span className="font-semibold text-slate-900">{warrantyResult.warranty_expiry}</span>
+                </div>
+                {warrantyResult.last_order && (
+                  <div className="flex justify-between pt-1 border-t border-slate-200">
+                    <span className="text-slate-500">No. Invoice Terakhir:</span>
+                    <span className="font-mono font-bold text-brand-600">{warrantyResult.last_order}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowWarrantyModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

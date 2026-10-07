@@ -70,6 +70,29 @@ class ProductCreate(BaseModel):
     variants: Optional[List[VariantCreate]] = None
 
 
+class VariantOut(BaseModel):
+    id: int
+    name: str
+    sku: Optional[str]
+    cost_price: float
+    selling_price: float
+    stock: float
+
+    class Config:
+        from_attributes = True
+
+
+class SerialOut(BaseModel):
+    id: int
+    serial_number: str
+    status: str
+    warranty_months: int
+    warranty_expiry: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
 class ProductOut(BaseModel):
     id: int
     store_id: int
@@ -82,6 +105,8 @@ class ProductOut(BaseModel):
     track_stock: bool
     has_variants: bool
     has_serial_number: bool
+    variants: Optional[List[VariantOut]] = []
+    serials: Optional[List[SerialOut]] = []
 
     class Config:
         from_attributes = True

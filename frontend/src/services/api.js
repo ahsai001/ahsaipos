@@ -59,5 +59,8 @@ export const api = {
   checkout: (storeId, data) => 
     api.request(`/stores/${storeId}/pos/checkout`, { method: 'POST', body: JSON.stringify(data) }),
   getRecentOrders: (storeId) => 
-    api.request(`/stores/${storeId}/pos/recent-orders`)
+    api.request(`/stores/${storeId}/pos/recent-orders`),
+  checkWarranty: (storeId, serialNumber) =>
+    api.request(`/stores/${storeId}/pos/warranty-check?sn=${encodeURIComponent(serialNumber)}`)
 };
+
